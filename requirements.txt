@@ -1,0 +1,5 @@
+soundata
+numpy
+pandas
+matplotlib
+librosa
