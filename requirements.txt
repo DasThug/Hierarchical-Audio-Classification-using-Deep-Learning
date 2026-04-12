@@ -3,3 +3,5 @@ numpy
 pandas
 matplotlib
 librosa
+plotly
+torch
