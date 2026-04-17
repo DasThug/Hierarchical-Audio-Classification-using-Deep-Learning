@@ -3,5 +3,10 @@ numpy
 pandas
 matplotlib
 librosa
-plotly
-torch
+scikit-learn
+soundfile
+
+# Torch packages must have same version
+torch == 2.11.0
+torchaudio == 2.11.0
+# torchcodec
