@@ -1,3 +1,4 @@
+import ast
 import torch
 import torchaudio
 import torch.nn.functional as F
@@ -33,10 +34,12 @@ class AudioTransform:
         Number of Mel frequency bins to use. Default is 64.
     """
 
-    def __init__(self, sample_rate=22050, n_mels=64): # Init Class params
+    def __init__(self, sample_rate=22050, n_mels=64, n_fft=512, hop_length=256): # Init Class params
         self.mel = torchaudio.transforms.MelSpectrogram(
             sample_rate=sample_rate,
-            n_mels=n_mels
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length
         )
 
     def __call__(self, waveform):
@@ -205,17 +208,20 @@ class AudioDataset(Dataset):
 
 
         # Construct mapping of individual hierarchical level class targets:
-        target_levels = {}
-        hierarchical_targets = row.get("hierarchy_class_id", None) # [level_1, level_2, ..., level_n]
-        for level in range(len(self.hierarchy_levels)):
-            target_levels[f"target_level_{level}"] = (
-                torch.tensor(hierarchical_targets[level], dtype=torch.long) # must be integer class indices for every hierarchy level
-                if hierarchical_targets is not None else None
-            )
-
+        hierarchical_targets = row.get("hierarchy", None) # "[level_1, level_2, ..., level_n]"
+        if hierarchical_targets:
+            hierarchical_targets = ast.literal_eval(hierarchical_targets)  # Convert string representation to list
+            
+        target_levels = {
+            f"target_level_{level}": torch.tensor(class_idx, dtype=torch.long)
+            for level, class_idx in enumerate(hierarchical_targets)
+            }
+        hierarchy_target = torch.tensor(hierarchical_targets,dtype=torch.long) # Full hierarchy path tensor
+        
         datapoint_data = {
             "input": spec,                                              # (1, mel, time)
             "target": torch.tensor(row["class_id"], dtype=torch.long),  # tensor('class_id')
+            "hierarchy_target": hierarchy_target,                              # tensor([level_1, level_2, ..., level_n])
             "index": idx,                                               # index: int
             "meta": {           
                 "clip_id": row.get("clip_id", None),                    # clip_id: soundata clip id
