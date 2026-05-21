@@ -24,7 +24,7 @@ CONFIG = {
     # training
     "train_size": 0.8,   # Only used if dataset doesn't have official train/test split
     "test_size": 0.2,    # Only used if dataset doesn't have official train/test split
-    "epochs": 1,
+    "epochs": 100,
     "learning_rate": 1e-3,
     "batch_size": 4,
 
