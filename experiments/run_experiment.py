@@ -38,6 +38,22 @@ def run_experiment(config):
                                                 # Requires a list of classes, which indices correspond to the sample in the dataset_df
             random_state= config["seed"],
         )
+    
+    # Temporary debug subset
+    if config.get("debug_small_data", False):
+        train_data = (
+            train_data
+            .sample(n=min(100, len(train_data)), random_state=config["seed"])
+            .reset_index(drop=True)
+        )
+
+        test_data = (
+            test_data
+            .sample(n=min(10, len(test_data)), random_state=config["seed"])
+            .reset_index(drop=True)
+        )
+
+        print("DEBUG SMALL DATA ENABLED")
 
     print("FULL Dataset: {}".format(dataset_df.shape))  # (nr of samples, columns)
     print("TRAIN Dataset: {}".format(train_data.shape)) # (nr of samples, columns)
@@ -99,9 +115,13 @@ def run_experiment(config):
         scheduler=None,
         log_csv_path=f"outputs/{config['experiment_name']}/metrics.csv",
         prediction_csv_path=f"outputs/{config['experiment_name']}/predictions.csv",
+        debug_validation=config.get("debug_predictions", False),
+        debug_csv_path=f"outputs/{config['experiment_name']}/debug_predictions.csv",
+        runtime_json_path=f"outputs/{config['experiment_name']}/runtime_summary.json",
+        experiment_name=config["experiment_name"],
     )
 
-    torch.save(model.state_dict(), out_dir / "final_model.pt")
+    # torch.save(model.state_dict(), out_dir / "final_model.pt") # Save final model weights
     pd.Series(config).astype(str).to_json(out_dir / "config.json", indent=4)
 
     return history

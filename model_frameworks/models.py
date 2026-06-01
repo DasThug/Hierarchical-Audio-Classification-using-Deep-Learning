@@ -244,6 +244,13 @@ class Hierarchical_VGG16(nn.Module):
         return logits_by_level
 
 
+############################
+# Updated models: 
+############################
+
+
+
+
 class MaskedHierarchicalVGG16(nn.Module):
     """
     Masked hierarchical VGG16 model.
@@ -492,6 +499,7 @@ class MaskedHierarchicalVGG16(nn.Module):
             "masks": masks_by_level,
             "path_log_prob": path_log_prob,
             "path_prob": path_log_prob.exp(),
+            "raw_logits": raw_logits_by_level,
         }
     
     def forward(self, x):
@@ -515,7 +523,7 @@ class MaskedHierarchicalVGG16(nn.Module):
 
         # normalize keys to match expected API: use "logits" for masked logits
         masked_logits = loss_outputs.pop("masked_logits")
-        loss_outputs["logits"] = masked_logits
+        loss_outputs["masked_logits"] = masked_logits
         loss_outputs["raw_logits"] = raw_logits_by_level
 
         return loss_outputs
