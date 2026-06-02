@@ -23,7 +23,7 @@ CONFIG_1 = AR_HIERARCHY_MASKED
 CONFIG_2 = INDEPENDENT_HIERARCHY
 CONFIG_3 = FLAT
 
-for config in [TEST_CONFIG]:
+for config in [CONFIG_1, CONFIG_2, CONFIG_3]:
     name_identifier = config["experiment_name"]
     
     for seed in seeds:
