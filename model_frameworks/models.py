@@ -43,7 +43,7 @@ class VGG16(nn.Module):
 
         return x
 
-class FlatVGG16(nn.Module):
+class old_FlatVGG16(nn.Module):
     """
     Flat VGG16 baseline compatible with the hierarchical training framework.
 
@@ -248,6 +248,347 @@ class Hierarchical_VGG16(nn.Module):
 # Updated models: 
 ############################
 
+class FlatVGG16(nn.Module):
+    """
+    Flat VGG-style baseline compatible with the shared training/validation loop.
+
+    - Shared VGG-style CNN backbone.
+    - Single classifier head.
+    - Predicts only the leaf-level class.
+    - Uses hierarchy_target[:, -1] as the target.
+    """
+
+    def __init__(
+        self,
+        hierarchy_tree: HierarchyTree,
+        dropout=0.3,
+        feature_dim=512,
+        hidden_dims=(512, 256),
+    ):
+        super().__init__()
+
+        self.hierarchy_tree = hierarchy_tree
+        self.depth = hierarchy_tree.total_depth
+        self.class_counts = dict(sorted(hierarchy_tree.num_classes_per_level().items()))
+        self.feature_dim = feature_dim
+        self.leaf_level = self.depth - 1
+        self.num_classes = self.class_counts[self.leaf_level]
+
+        # Backbone (VGG-style ConvBlocks)
+        self.blocks = nn.ModuleList([
+            ConvBlock(1,   64,  num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(64,  128, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(128, 256, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(256, 512, num_convs=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(512, 512, num_convs=3, padding="same", pool=True, pool_type="max", pool_size=2),
+        ])
+
+        # A single leaf classifier head that recieves a feature vector h
+        self.classifier = self._make_head(
+            input_dim=feature_dim,
+            hidden_dims=hidden_dims,
+            output_dim=self.num_classes,
+            dropout=dropout,
+        )
+
+    def _make_head(self, input_dim, hidden_dims, output_dim, dropout):
+        layers = []
+        current_dim = input_dim
+
+        for hidden_dim in hidden_dims:
+            layers.extend([
+                nn.Linear(current_dim, hidden_dim),
+                nn.ReLU(inplace=True),
+                nn.Dropout(dropout),
+            ])
+            current_dim = hidden_dim
+
+        layers.append(nn.Linear(current_dim, output_dim))
+        return nn.Sequential(*layers)
+
+    def extract_features(self, x):
+        # Pass input through CNN backbone: x -> blocks -> global pooling -> feature vector h
+        # Expected input: [batch, 1, n_mels, time]
+        for block in self.blocks:
+            x = block(x)
+
+        # global pooling
+        x_max = torch.amax(x, dim=[2, 3])
+        x_mean = torch.mean(x, dim=[2, 3])
+        return x_max + x_mean
+
+    def forward(self, x):
+        h = self.extract_features(x)
+
+        # compute raw logits for the leaf levelclassifier
+        logits = self.classifier(h)
+        return logits
+
+    def compute_loss(self, logits, hierarchy_target):
+        if hierarchy_target.ndim == 1:
+            leaf_target = hierarchy_target
+        else:
+            leaf_target = hierarchy_target[:, -1]
+
+        leaf_target = leaf_target.to(device=logits.device, dtype=torch.long)
+
+        loss = F.cross_entropy(logits, leaf_target)
+
+        log_probs = F.log_softmax(logits, dim=1)
+        probs = log_probs.exp()
+
+        selected_log_prob = log_probs.gather(
+            1,
+            leaf_target.unsqueeze(1)
+        ).squeeze(1)
+
+        return {
+            "loss": loss,
+
+            "path_log_prob": selected_log_prob, # Is just the single leaf log probability
+            "path_prob": selected_log_prob.exp(), # Is just the single leaf probability
+
+            "log_probs": {self.leaf_level: log_probs}, # one leaf key -> log probs Tensor for all leaf classes
+            "probs": {self.leaf_level: probs}, # one leaf key -> probs Tensor for all leaf classes
+            "raw_logits": {self.leaf_level: logits}, # one leaf key -> raw logits Tensor for all leaf classes
+
+            # NOTE: Can possibly add a train prediction 
+        }
+
+    def training_step(self, x, hierarchy_target):
+        # forward() returns raw logits by level
+        logits = self.forward(x)
+
+        # compute_loss validates targets and returns logits/log-probs/losses
+        loss_outputs = self.compute_loss(logits=logits, hierarchy_target=hierarchy_target)
+
+        # retrieve a prediction for the leaf metric during training 
+        pred_leaf = torch.argmax(loss_outputs["log_probs"][self.leaf_level], dim=1)
+        loss_outputs["train_prediction"] = pred_leaf
+        return loss_outputs
+
+    @torch.no_grad()
+    def predict(self, x):
+        logits = self.forward(x)
+
+        log_probs = F.log_softmax(logits, dim=1)
+        probs = log_probs.exp()
+
+        pred_leaf = torch.argmax(log_probs, dim=1)
+
+        pred_log_prob = log_probs.gather(
+            1,
+            pred_leaf.unsqueeze(1)
+        ).squeeze(1)
+
+        return {
+            "prediction": pred_leaf, # instead of 'pred_path' for multi level models
+            "path_log_prob": pred_log_prob,
+            "path_prob": pred_log_prob.exp(),
+            "raw_logits": {self.leaf_level: logits},
+        }
+
+
+class IndependentMultiHeadVGG16(nn.Module):
+    """
+    Independent multi-head VGG-style CNN.
+
+    - Shared CNN backbone.
+    - One independent classifier head per hierarchy level.
+    """
+
+    def __init__(
+        self,
+        hierarchy_tree: HierarchyTree,
+        dropout=0.3,
+        feature_dim=512,
+        hidden_dims=(512, 256),
+    ):
+        super().__init__()
+
+        self.hierarchy_tree = hierarchy_tree
+        self.depth = hierarchy_tree.total_depth
+        self.class_counts = dict(sorted(hierarchy_tree.num_classes_per_level().items()))
+        self.feature_dim = feature_dim
+
+        expected_levels = list(range(self.depth))
+        if list(self.class_counts.keys()) != expected_levels:
+            raise ValueError(
+                "Hierarchy levels must be contiguous and zero-indexed. "
+                f"Expected {expected_levels}, got {list(self.class_counts.keys())}."
+            )
+        
+        # Backbone (VGG-style ConvBlocks)
+        self.blocks = nn.ModuleList([
+            ConvBlock(1,   64,  num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(64,  128, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(128, 256, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(256, 512, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(512, 512, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+        ])
+        
+        # Heads: one head per level, each receives only feature vector h
+        self.heads = nn.ModuleDict()
+        for level in range(self.depth):
+            self.heads[str(level)] = self._make_head(
+                input_dim=feature_dim,
+                hidden_dims=hidden_dims,
+                output_dim=self.class_counts[level],
+                dropout=dropout,
+            )
+
+    def _make_head(self, input_dim, hidden_dims, output_dim, dropout):
+        layers = []
+        current_dim = input_dim
+
+        for hidden_dim in hidden_dims:
+            layers.extend([
+                nn.Linear(current_dim, hidden_dim),
+                nn.ReLU(inplace=True),
+                nn.Dropout(dropout),
+            ])
+            current_dim = hidden_dim
+
+        layers.append(nn.Linear(current_dim, output_dim))
+        return nn.Sequential(*layers)
+
+    def extract_features(self, x):
+        # Pass input through CNN backbone: x -> blocks -> global pooling -> feature vector h
+        # Expected input: [batch, 1, n_mels, time]
+        for block in self.blocks:
+            x = block(x)
+
+        # global pooling
+        x_max = torch.amax(x, dim=[2, 3])
+        x_mean = torch.mean(x, dim=[2, 3])
+        return x_max + x_mean
+
+    def forward(self, x):
+        h = self.extract_features(x)
+
+        raw_logits_by_level = {}
+
+        # compute raw logits for each level (heads only depend on h)
+        for level in range(self.depth):
+            raw_logits_by_level[level] = self.heads[str(level)](h)
+
+        return raw_logits_by_level
+
+    def compute_loss(self, raw_logits_by_level, hierarchy_target):
+        first_logits = raw_logits_by_level[0]
+        batch_size = first_logits.shape[0]
+        device = first_logits.device
+
+        if hierarchy_target.ndim == 1:
+            hierarchy_target = hierarchy_target.unsqueeze(0)
+
+        hierarchy_target = hierarchy_target.to(device=device, dtype=torch.long)
+
+        if hierarchy_target.shape[0] != batch_size:
+            raise ValueError("hierarchy_target batch size must match logits batch size")
+
+        if hierarchy_target.shape[1] != self.depth:
+            raise ValueError(
+                f"hierarchy_target must contain one class index per hierarchy level. "
+                f"Expected {self.depth}, got {hierarchy_target.shape[1]}."
+            )
+
+        log_probs_by_level = {}
+        probs_by_level = {}
+
+        losses = []
+        selected_log_probs = []
+
+        for level in range(self.depth):
+            logits = raw_logits_by_level[level]
+            target_l = hierarchy_target[:, level]
+
+            loss_l = F.cross_entropy(logits, target_l)
+            losses.append(loss_l)
+
+            log_probs = F.log_softmax(logits, dim=1)
+            probs = log_probs.exp()
+
+            selected_logp = log_probs.gather(1,target_l.unsqueeze(1)).squeeze(1)
+            selected_log_probs.append(selected_logp)
+
+            log_probs_by_level[level] = log_probs
+            probs_by_level[level] = probs
+
+        total_loss = sum(losses)
+
+        # This is the product of independent per-level probabilities assigned to the target labels.
+        path_log_prob = torch.stack(selected_log_probs, dim=1).sum(dim=1)
+
+        return {
+            # Total training loss across all hierarchy levels
+            # Tensor shape: []
+            "loss": total_loss,
+
+            # Per-level losses
+            # losses[level] -> scalar tensor
+            "losses": losses,
+
+            # Per-level log probabilities
+            # log_probs[level] -> Tensor[batch_size, num_classes_level]
+            # Access: log_probs[level][batch_idx, class_idx]
+            "log_probs": log_probs_by_level,
+
+            # Per-level probabilities
+            # probs[level] -> Tensor[batch_size, num_classes_level]
+            # Access: probs[level][batch_idx, class_idx]
+            "probs": probs_by_level,
+
+            # Joint log-probability of the target path
+            # Tensor[batch_size]
+            # Access: path_log_prob[batch_idx]
+            "path_log_prob": path_log_prob,
+
+            # Joint probability of the target path
+            # Tensor[batch_size]
+            # Access: path_prob[batch_idx]
+            "path_prob": path_log_prob.exp(),
+
+            # Raw classifier outputs before softmax
+            # raw_logits[level] -> Tensor[batch_size, num_classes_level]
+            # Access: raw_logits[level][batch_idx, class_idx]
+            "raw_logits": raw_logits_by_level,
+        }
+
+    def training_step(self, x, hierarchy_target):
+        # forward() returns raw logits by level
+        raw_logits_by_level = self.forward(x)
+
+        # compute_loss validates targets and returns logits/log-probs/losses
+        return self.compute_loss(raw_logits_by_level=raw_logits_by_level, hierarchy_target=hierarchy_target)
+
+    @torch.no_grad()
+    def predict(self, x):
+        raw_logits_by_level = self.forward(x)
+
+        preds_by_level = []
+        selected_log_probs = []
+
+        # Predict the most probable path level-by-level independently
+        for level in range(self.depth):
+            logits = raw_logits_by_level[level]
+            log_probs = F.log_softmax(logits, dim=1)
+
+            pred_l = torch.argmax(log_probs, dim=1)
+            preds_by_level.append(pred_l)
+
+            selected_logp = log_probs.gather(1, pred_l.unsqueeze(1)).squeeze(1)
+            selected_log_probs.append(selected_logp)
+
+        pred_path = torch.stack(preds_by_level, dim=1)
+        path_log_prob = torch.stack(selected_log_probs, dim=1).sum(dim=1)
+
+        return {
+            "path": pred_path,
+            "path_log_prob": path_log_prob,
+            "path_prob": path_log_prob.exp(),
+            "raw_logits": raw_logits_by_level,
+        }
 
 
 
@@ -286,7 +627,7 @@ class MaskedHierarchicalVGG16(nn.Module):
                 f"Expected {expected_levels}, got {list(self.class_counts.keys())}."
             )
 
-        # Backbone (same VGG-style ConvBlocks)
+        # Backbone (VGG-style ConvBlocks)
         self.blocks = nn.ModuleList([
             ConvBlock(1,   64,  num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
             ConvBlock(64,  128, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),

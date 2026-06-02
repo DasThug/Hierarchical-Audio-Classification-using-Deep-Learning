@@ -1,9 +1,9 @@
-from model_frameworks.models import MaskedHierarchicalVGG16
+from model_frameworks.models import IndependentMultiHeadVGG16, FlatVGG16, MaskedHierarchicalVGG16
 
 CONFIG = {
 
     # experiment
-    "experiment_name": "ar_hierarchy_masked",
+    "experiment_name": "TEST_cnn",
 
     # dataset
     "dataset": "urbansound8k",
@@ -13,7 +13,7 @@ CONFIG = {
     "hierarchy": "urbansound8k",
 
     # model
-    "model_class": MaskedHierarchicalVGG16,
+    "model_class": FlatVGG16,
 
     "model_kwargs": {
         "dropout": 0.3,
@@ -24,7 +24,7 @@ CONFIG = {
     # training
     "train_size": 0.8,   # Only used if dataset doesn't have official train/test split
     "test_size": 0.2,    # Only used if dataset doesn't have official train/test split
-    "epochs": 80,
+    "epochs": 1,
     "learning_rate": 1e-5,
     "batch_size": 4,
 
@@ -38,6 +38,6 @@ CONFIG = {
     "seed": 42,
 
     # debugging
-    "debug_small_data": False,
-    "debug_predictions": False,
+    "debug_small_data": True,
+    "debug_predictions": True,
 }

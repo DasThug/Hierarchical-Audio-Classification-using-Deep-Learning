@@ -1,4 +1,4 @@
-from model_frameworks.models import MaskedHierarchicalVGG16
+from model_frameworks.models import IndependentMultiHeadVGG16
 
 CONFIG = {
 
@@ -13,7 +13,7 @@ CONFIG = {
     "hierarchy": "urbansound8k",
 
     # model
-    "model_class": MaskedHierarchicalVGG16,
+    "model_class": IndependentMultiHeadVGG16,
 
     "model_kwargs": {
         "dropout": 0.3,
