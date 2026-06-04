@@ -3,7 +3,7 @@ from model_frameworks.models import FlatVGG16
 CONFIG = {
 
     # experiment
-    "experiment_name": "ar_hierarchy_masked",
+    "experiment_name": "flat",
 
     # dataset
     "dataset": "urbansound8k",

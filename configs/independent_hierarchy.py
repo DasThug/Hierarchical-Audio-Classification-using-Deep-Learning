@@ -3,7 +3,7 @@ from model_frameworks.models import IndependentMultiHeadVGG16
 CONFIG = {
 
     # experiment
-    "experiment_name": "ar_hierarchy_masked",
+    "experiment_name": "independent_hierarchy",
 
     # dataset
     "dataset": "urbansound8k",
