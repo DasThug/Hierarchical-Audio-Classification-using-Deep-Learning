@@ -1,0 +1,21 @@
+{
+    "experiment_name":"independent_hierarchy_seed82",
+    "dataset":"urbansound8k",
+    "dataset_path":"data\/urbansound8k_compiled.csv",
+    "hierarchy":"urbansound8k",
+    "model_class":"<class 'model_frameworks.models.IndependentMultiHeadVGG16'>",
+    "model_kwargs":"{'dropout': 0.3, 'feature_dim': 512}",
+    "num_workers":"0",
+    "train_size":"0.8",
+    "test_size":"0.2",
+    "epochs":"80",
+    "learning_rate":"1e-05",
+    "batch_size":"4",
+    "sample_rate":"22050",
+    "n_mels":"128",
+    "n_fft":"1024",
+    "hop_length":"512",
+    "seed":"82",
+    "debug_small_data":"False",
+    "debug_predictions":"False"
+}
