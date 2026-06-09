@@ -17,13 +17,13 @@ CONFIG_TEST = TEST_CONFIG
 # Define experemet configurations to run:
 
 # Reproducibility seeds
-seeds = [80, 81, 82, 83, 84, 85]
+seeds = [80]
 
 CONFIG_1 = AR_HIERARCHY_MASKED
 CONFIG_2 = INDEPENDENT_HIERARCHY
 CONFIG_3 = FLAT
 
-for config in [CONFIG_1, CONFIG_2, CONFIG_3]:
+for config in [CONFIG_3]:
     name_identifier = config["experiment_name"]
     
     for seed in seeds:

@@ -17,7 +17,8 @@ CONFIG = {
 
     "model_kwargs": {
         "dropout": 0.3,
-        "feature_dim": 512
+        "feature_dim": 512,
+        "hidden_dims": (512,)
     },
     "num_workers": 0, # Set to 0 for Windows, or if you encounter issues with multiprocessing
 

@@ -274,13 +274,12 @@ class FlatVGG16(nn.Module):
         self.leaf_level = self.depth - 1
         self.num_classes = self.class_counts[self.leaf_level]
 
-        # Backbone (VGG-style ConvBlocks)
+        # Backbone (CNN10-style ConvBlocks)
         self.blocks = nn.ModuleList([
-            ConvBlock(1,   64,  num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(64,  128, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(128, 256, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(256, 512, num_convs=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(512, 512, num_convs=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(1,   64,  num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
+            ConvBlock(64,  128, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
+            ConvBlock(128, 256, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
+            ConvBlock(256, 512, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
         ])
 
         # A single leaf classifier head that recieves a feature vector h
