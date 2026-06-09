@@ -626,13 +626,12 @@ class MaskedHierarchicalVGG16(nn.Module):
                 f"Expected {expected_levels}, got {list(self.class_counts.keys())}."
             )
 
-        # Backbone (VGG-style ConvBlocks)
+        # Backbone (CNN10-style ConvBlocks)
         self.blocks = nn.ModuleList([
-            ConvBlock(1,   64,  num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(64,  128, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(128, 256, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(256, 512, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
-            ConvBlock(512, 512, num_convs=3, kernel_size=3, padding="same", pool=True, pool_type="max", pool_size=2),
+            ConvBlock(1,   64,  num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
+            ConvBlock(64,  128, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
+            ConvBlock(128, 256, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
+            ConvBlock(256, 512, num_convs=2, kernel_size=3, padding="same", pool=True, pool_type="avg", pool_size=2),
         ])
 
         # Heads: one head per level, each receives only feature vector h

@@ -16,9 +16,9 @@ CONFIG = {
     "model_class": MaskedHierarchicalVGG16,
 
     "model_kwargs": {
-        "dropout": 0.3,
+        "dropout": 0.4,
         "feature_dim": 512,
-        "hidden_dims": (512,)
+        "hidden_dims": (256,)
     },
     "num_workers": 0, # Set to 0 for Windows, or if you encounter issues with multiprocessing
 

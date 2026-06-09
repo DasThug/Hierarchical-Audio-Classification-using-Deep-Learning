@@ -19,6 +19,7 @@ bsc-hac/
 
 # Folders
 metadata/
+data/
 outputs_local/
 
 # OS files
