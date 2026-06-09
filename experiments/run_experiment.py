@@ -4,12 +4,25 @@ import numpy as np
 import random
 import pandas as pd
 from pathlib import Path
+from dataclasses import dataclass
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from hierarchies.hierarchies import get_hierarchy_tree
 from model_frameworks.dataloader_utilities import AudioDataset, AudioTransform
 from training.fit import fit
+
+
+@dataclass
+class RunContext:
+    """ Data transfer object for experiment run context, to avoid long argument lists. """
+    log_csv_path: str
+    prediction_csv_path: str
+    debug_validation: bool
+    debug_csv_path: str
+    runtime_json_path: str
+    experiment_name: str
+    models_dir: Path = None
 
 
 def run_experiment(config):
@@ -103,6 +116,19 @@ def run_experiment(config):
     out_dir = Path("outputs") / config["experiment_name"]
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    models_dir = out_dir / "models"
+    models_dir.mkdir(exist_ok=True)
+
+    context = RunContext(
+        log_csv_path=f"outputs/{config['experiment_name']}/metrics.csv",
+        prediction_csv_path=f"outputs/{config['experiment_name']}/predictions.csv",
+        debug_validation=config.get("debug_predictions", False),
+        debug_csv_path=f"outputs/{config['experiment_name']}/debug_predictions.csv",
+        runtime_json_path=f"outputs/{config['experiment_name']}/runtime_summary.json",
+        experiment_name=config["experiment_name"],
+        models_dir=models_dir,
+    )
+
     history = fit(
         model=model,
         train_loader=training_loader,
@@ -113,12 +139,7 @@ def run_experiment(config):
         metrics_fn=None,
         augmentation_fn=None,
         scheduler=None,
-        log_csv_path=f"outputs/{config['experiment_name']}/metrics.csv",
-        prediction_csv_path=f"outputs/{config['experiment_name']}/predictions.csv",
-        debug_validation=config.get("debug_predictions", False),
-        debug_csv_path=f"outputs/{config['experiment_name']}/debug_predictions.csv",
-        runtime_json_path=f"outputs/{config['experiment_name']}/runtime_summary.json",
-        experiment_name=config["experiment_name"],
+        run_context=context,
     )
 
     # torch.save(model.state_dict(), out_dir / "final_model.pt") # Save final model weights

@@ -135,8 +135,8 @@ def validate(
     dataloader,         # Test/Validation loader, (Dataloader object)
     # loss_fn,              # Criterion loss function, (Wraps a criterion to pass input and targets from batch) (ALL LOSS_FN SHOULD BE METHODS IN THE MODEL CLASS)
     device,             # torch.device
-    metrics_fn=None,     #
-    debug_validation=False, #
+    metrics_fn=None,    #
+    run_context=None, 
 ):
     val_start_time = time.time()
 
@@ -230,7 +230,7 @@ def validate(
                     all_probs_by_level[level].append(probs.detach().cpu()) # PACK METRIC: Dictionary of lists of per-level probabilities for the target path, (dict of list of tensors) (None if not returned by model)
 
         
-            if debug_validation:
+            if run_context.debug_validation:
                 masks = safe_get(loss_outputs, "masks") # METRIC: Masks applied at each level. Expected shape (batch_size, num_classes_per_level). If not present: None
                 if masks is not None:
                     for level, mask in masks.items():
@@ -344,11 +344,12 @@ def validate(
     masked_logits_by_level_all = {}
     raw_logits_by_level_all = {}
     
-    if debug_validation:
+    if run_context.debug_validation:
         probs_by_level_all = safe_cat_dict(all_probs_by_level)
         masks_by_level_all = safe_cat_dict(all_masks_by_level)
         masked_logits_by_level_all = safe_cat_dict(all_masked_logits_by_level)
         raw_logits_by_level_all = safe_cat_dict(all_raw_logits_by_level)
+
 
     return {
         "loss": total_loss / num_batches,
@@ -417,17 +418,12 @@ def fit(
     metrics_fn=None,        # 
     augmentation_fn=None,   # Augmentation function object, (etc. Mixup, ..)
     scheduler=None,         # Update Learnin Rate at the end of an epoch, (etc. StepLR, ..)
-    log_csv_path="outputs/epoch_logs.csv",
-    prediction_csv_path="outputs/prediction_logs.csv",
-    debug_validation=False,
-    debug_csv_path="outputs/debug_predictions.csv",
-    runtime_json_path=f"outputs/runtime_summary.json",
-    experiment_name=None,
+    run_context=None,
 ):
     
     experiment_start_time = time.time()
     experiment_start_timestamp = datetime.now()
-    print(f"TRAINING STARTED: {experiment_name}, {experiment_start_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"TRAINING STARTED: {run_context.experiment_name}, {experiment_start_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
 
     history = {
         # Save metrics and other measurements
@@ -471,7 +467,7 @@ def fit(
             dataloader=val_loader,
             device=device,
             metrics_fn=metrics_fn,
-            debug_validation=debug_validation,
+            run_context=run_context,
         )
         # Both loops return "loss" and "metric"
 
@@ -541,7 +537,7 @@ def fit(
         for level, acc in val_stats["per_level_acc"].items():
             epoch_log[f"val_level_{level}_acc"] = acc
         
-        append_epoch_log(epoch_log, csv_path=log_csv_path)
+        append_epoch_log(epoch_log, csv_path=run_context.log_csv_path)
 
         # Per-Sample validation predictions CSV
         append_prediction_log(
@@ -555,10 +551,10 @@ def fit(
             path_scores=val_stats["path_scores"],
             candidate_paths=val_stats["candidate_paths"],
             probs_by_level=val_stats["probs_by_level"],
-            csv_path=prediction_csv_path,
+            csv_path=run_context.prediction_csv_path,
         )
 
-        if debug_validation and debug_csv_path is not None:
+        if run_context.debug_validation and run_context.debug_csv_path is not None:
             append_debug_prediction_log(
                 epoch=epoch + 1,
                 pred_paths=val_stats["pred_paths"],
@@ -573,8 +569,12 @@ def fit(
                 masks_by_level=val_stats["masks_by_level"],
                 masked_logits_by_level=val_stats["masked_logits_by_level"],
                 raw_logits_by_level=val_stats["raw_logits_by_level"],
-                csv_path=debug_csv_path,
+                csv_path=run_context.debug_csv_path,
             )
+        
+        if epoch % 5 == 0 or epoch == 0 or epoch == epochs - 1:
+            torch.save(model.state_dict(), run_context.models_dir / f"model_epoch_{epoch + 1}.pt")
+
         
     experiment_end_time = time.time()
     experiment_end_timestamp = datetime.now()
@@ -582,14 +582,14 @@ def fit(
     total_runtime_seconds = experiment_end_time - experiment_start_time
     total_runtime_hours = total_runtime_seconds / 3600
 
-    print(f"TRAINING FINISHED: {experiment_name}")
+    print(f"TRAINING FINISHED: {run_context.experiment_name}")
     print(f"Started : {experiment_start_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Finished: {experiment_end_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Runtime : {total_runtime_hours:.2f} hours")
 
     save_runtime_summary(
-        runtime_path=runtime_json_path,
-        experiment_name=experiment_name,
+        runtime_path=run_context.runtime_json_path,
+        experiment_name=run_context.experiment_name,
         start_ts=experiment_start_timestamp,
         end_ts=experiment_end_timestamp,
         runtime_seconds=total_runtime_seconds,

@@ -17,8 +17,9 @@ bsc-hac/
 .vscode/
 
 
-# Dataset artifacts
+# Folders
 metadata/
+outputs_local/
 
 # OS files
 .DS_Store
