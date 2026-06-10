@@ -100,7 +100,7 @@ def run_experiment(config):
     model.to(device)
 
     # Optimizer
-    optimizer = optim.Adam(model.parameters(), lr=config["learning_rate"]) # TODO: There is other parameters to explore: betas=(0.9, 0.999), eps=1e-08, weight_decay=0., amsgrad=True)
+    optimizer = optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"]) # TODO: There is other parameters to explore: betas=(0.9, 0.999), eps=1e-08, weight_decay=0., amsgrad=True)
 
 
     # DEBUGGING: Check the dataloader output

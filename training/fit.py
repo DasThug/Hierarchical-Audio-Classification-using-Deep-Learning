@@ -572,7 +572,7 @@ def fit(
                 csv_path=run_context.debug_csv_path,
             )
         
-        if epoch % 5 == 0 or epoch == 0 or epoch == epochs - 1:
+        if epoch % 10 == 0 or epoch == 0 or epoch == epochs - 1:
             torch.save(model.state_dict(), run_context.models_dir / f"model_epoch_{epoch + 1}.pt")
 
         
