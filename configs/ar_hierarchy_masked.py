@@ -16,8 +16,9 @@ CONFIG = {
     "model_class": MaskedHierarchicalVGG16,
 
     "model_kwargs": {
-        "dropout": 0.3,
-        "feature_dim": 512
+        "dropout": 0.4,
+        "feature_dim": 512,
+        "hidden_dims": (256,)
     },
     "num_workers": 0, # Set to 0 for Windows, or if you encounter issues with multiprocessing
 
@@ -32,7 +33,7 @@ CONFIG = {
     "sample_rate": 22050,
     "n_mels": 128,
     "n_fft": 1024,
-    "hop_length": 512,
+    "hop_length": 320,
 
     # reproducibility
     "seed": 42,
