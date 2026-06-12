@@ -40,6 +40,8 @@ else:
         random_state= config["seed"],
     )
 # Temporary debug subset
+
+"""
 if config.get("debug_small_data", False):
     train_data = (
         train_data
@@ -54,6 +56,7 @@ if config.get("debug_small_data", False):
     )
 
     print("DEBUG SMALL DATA ENABLED")
+"""
 
 print("FULL Dataset: {}".format(dataset_df.shape))  # (nr of samples, columns)
 print("TRAIN Dataset: {}".format(train_data.shape)) # (nr of samples, columns)
@@ -93,6 +96,15 @@ print("Batch targets:",targets) # List of target, on index corresponding to samp
 
 # Model debugging: --------------------------------------------------------------------------------
 
+# Load saved weights
+checkpoint_path = Path("outputs_local/ar_hierarchy_masked_debug/models/model_epoch_61.pt") 
+model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+model.eval() # dropout disabled (used in validation/test)
+loss_threshold = 0.5
+printing = False
+
+records = []
+
 total_loss = 0.0
 total_correct_leaf = 0
 num_leaf_acc_samples = 0
@@ -101,56 +113,128 @@ num_path_log_prob_batches = 0
 total_path_prob = 0.0
 num_path_prob_batches = 0
 
-model.eval() # dropout disabled (used in validation/test)
+with torch.no_grad():
+    for idx_batch, batch_data in enumerate(training_loader, 0):
+        print(f"Batch {idx_batch}/{len(training_loader)}")
 
-for idx_batch, batch_data in enumerate(training_loader, 0):
-    # Move tensors to device
-    batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch_data.items()}
+        # Move tensors to device
+        batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch_data.items()}
 
-    inputs = batch["input"]
-    hierarchy_target = batch["hierarchy_target"] # REQUIREMENT: All models should recieve the full hierarchy target (flat classifiers only consider last index)
+        inputs = batch["input"]
+        hierarchy_target = batch["hierarchy_target"] # REQUIREMENT: All models should recieve the full hierarchy target (flat classifiers only consider last index)
 
-    # Forward + model-specific loss
-    with torch.no_grad():
+        # Forward + model-specific loss
         outputs = model.training_step(x=inputs, hierarchy_target=hierarchy_target)
 
-    loss = safe_get(outputs, "loss") # REQUIREMENT: Loss is expected in all models.
-    if loss is None:
-        raise ValueError("model.training_step() must return a 'loss' key.")
+        loss = safe_get(outputs, "loss") # REQUIREMENT: Loss is expected in all models.
+        if loss is None:
+            raise ValueError("model.training_step() must return a 'loss' key.")
 
-    path_log_prob = safe_get(outputs, "path_log_prob")
-    manual_loss = -path_log_prob.mean()
+        path_log_prob = safe_get(outputs, "path_log_prob")
+        manual_loss = -path_log_prob.mean()
 
-    print("CE/summed loss:", loss.item())
-    print("Manual NLL loss:", manual_loss.item())
-    print("Difference:", abs(loss.item() - manual_loss.item()))
+        sample_losses = -path_log_prob
+        worst_indices = torch.argsort(sample_losses, descending=True)[:10]  
 
-    break
+        # inline print
+        if printing:
+            print("CE/summed loss:", loss.item())
+            print("Manual NLL loss:", manual_loss.item())
+            print("Difference:", abs(loss.item() - manual_loss.item()))
 
-    # Backward
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
+            for idx in worst_indices:
+                idx = idx.item()
+                print("\n" + "="*80)
+                print("Sample idx in batch:", idx)
+                print("Target path:", hierarchy_target[idx].tolist())
+                print("Sample loss:", sample_losses[idx].item())
+                print("Target path prob:", outputs["path_prob"][idx].item())
 
-    # Logging values
-    total_loss += loss.item()
+                for level in range(model.depth):
+                    target_l = hierarchy_target[idx, level].item()
+                    probs = outputs["probs"][level][idx]
+                    pred_l = probs.argmax().item()
 
-    prediction = safe_get(outputs, "train_prediction") # METRIC: Train prediction for flat leaf classifier. If not present: None
-    if prediction is not None:
-        target_leaf = hierarchy_target[:, -1]
-        correct_leaf = prediction == target_leaf
-        total_correct_leaf += correct_leaf.sum().item()
-        num_leaf_acc_samples += correct_leaf.numel()
+                    print(
+                        f"Level {level}: "
+                        f"target={target_l}, pred={pred_l}, "
+                        f"target_prob={probs[target_l].item():.8f}, "
+                        f"pred_prob={probs[pred_l].item():.8f}"
+                    )
 
-    path_log_prob = safe_get(outputs, "path_log_prob") # METRIC: Path log-prob is expected in leveled models. If not present: None
-    if path_log_prob is not None: 
-        total_path_log_prob += path_log_prob.mean().item()
-        num_path_log_prob_batches += 1
-    
-    path_prob = safe_get(outputs, "path_prob") # METRIC: Path prob is expected in leveled models. If not present: None
-    if path_prob is not None:
-        total_path_prob += path_prob.mean().item()
-        num_path_prob_batches += 1
+        # save records
+        for i in range(inputs.shape[0]):
+            records.append({
+                "batch": idx_batch,
+                "idx_in_batch": i,
+                "global_idx": batch["index"][i].item(),
+                "target_path": hierarchy_target[i].detach().cpu().tolist(),
+                "sample_loss": sample_losses[i].item(),
+                "target_path_prob": outputs["path_prob"][i].item(),
+                "outputs": {
+                    "target_probs": [
+                        outputs["probs"][level][i, hierarchy_target[i, level]].item()
+                        for level in range(model.depth)
+                    ],
+                    "preds": [
+                        outputs["probs"][level][i].argmax().item()
+                        for level in range(model.depth)
+                    ],
+                    "pred_probs": [
+                        outputs["probs"][level][i].max().item()
+                        for level in range(model.depth)
+                    ],
+                }
+            })
 
+
+        # break
+
+
+        # Backward
+        # optimizer.zero_grad()
+        # loss.backward()
+        # optimizer.step()
+
+        # # Logging values
+        # total_loss += loss.item()
+
+        # prediction = safe_get(outputs, "train_prediction") # METRIC: Train prediction for flat leaf classifier. If not present: None
+        # if prediction is not None:
+        #     target_leaf = hierarchy_target[:, -1]
+        #     correct_leaf = prediction == target_leaf
+        #     total_correct_leaf += correct_leaf.sum().item()
+        #     num_leaf_acc_samples += correct_leaf.numel()
+
+        # path_log_prob = safe_get(outputs, "path_log_prob") # METRIC: Path log-prob is expected in leveled models. If not present: None
+        # if path_log_prob is not None: 
+        #     total_path_log_prob += path_log_prob.mean().item()
+        #     num_path_log_prob_batches += 1
+        
+        # path_prob = safe_get(outputs, "path_prob") # METRIC: Path prob is expected in leveled models. If not present: None
+        # if path_prob is not None:
+        #     total_path_prob += path_prob.mean().item()
+        #     num_path_prob_batches += 1
+
+
+# check 20 worst records
+
+records = sorted(records, key=lambda r: r["sample_loss"], reverse=True)
+
+for r in records[:20]:
+    print("\n" + "="*80)
+    print("Global idx:", r["global_idx"])
+    print("Target path:", r["target_path"])
+    print("Sample loss:", r["sample_loss"])
+    print("Target path prob:", r["target_path_prob"])
+
+    for level in range(model.depth):
+        print(
+            f"Level {level}: "
+            f"target={r['target_path'][level]}, "
+            f"pred={r['outputs']['preds'][level]}, "
+            f"target_prob={r['outputs']['target_probs'][level]:.8f}, "
+            f"pred_prob={r['outputs']['pred_probs'][level]:.8f}"
+        )
 
 

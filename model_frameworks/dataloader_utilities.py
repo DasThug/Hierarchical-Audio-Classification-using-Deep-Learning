@@ -44,7 +44,7 @@ class AudioTransform:
 
     def __call__(self, waveform):
         x = self.mel(waveform)
-        x = torch.log(x + 1e-6)
+        x = torch.log(x + 1e-6) # epsilon = 1e-6
         return x
 
 
