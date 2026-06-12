@@ -26,7 +26,7 @@ CONFIG = {
     # training
     "train_size": 0.8,   # Only used if dataset doesn't have official train/test split
     "test_size": 0.2,    # Only used if dataset doesn't have official train/test split
-    "epochs": 80,
+    "epochs": 40,
     "learning_rate": 1e-5,
     "weight_decay": 1e-4, # Adam = 0, AdamW = 1e-2
     "batch_size": 4,
