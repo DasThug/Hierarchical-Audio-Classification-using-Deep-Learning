@@ -40,8 +40,22 @@ def run_experiment(config):
     if config["dataset"] == "urbansound8k":
         # Official UrbanSound8K protocol:
         # fold 10 → test, folds 1–9 → train
-        train_data = dataset_df[dataset_df["fold"] != 10].reset_index(drop=True)
-        test_data  = dataset_df[dataset_df["fold"] == 10].reset_index(drop=True)
+        test_fold = config.get("test_fold", 10)
+        split_mode = config.get("split_mode", "final_test") # "cv" or "final_test"
+
+        if split_mode == "cv":
+            val_fold = config["val_fold"]
+            train_data = dataset_df[(dataset_df["fold"] != test_fold) & (dataset_df["fold"] != val_fold)].reset_index(drop=True) # folds [1-9 ¬ val fold]
+            test_data = dataset_df[dataset_df["fold"] == val_fold].reset_index(drop=True) # val fold
+            print(f"CV split: train folds != {test_fold},{val_fold} | val fold = {val_fold}")
+
+        elif split_mode == "final_test":
+            train_data = dataset_df[dataset_df["fold"] != test_fold].reset_index(drop=True)
+            test_data = dataset_df[dataset_df["fold"] == test_fold].reset_index(drop=True)
+        
+        else:
+            raise ValueError(f"Unknown split_mode: {split_mode}")
+        
 
     else:
         train_data, test_data = train_test_split(

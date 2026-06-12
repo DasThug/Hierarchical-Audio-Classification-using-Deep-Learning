@@ -26,6 +26,11 @@ CONFIG = {
     # training
     "train_size": 0.8,   # Only used if dataset doesn't have official train/test split
     "test_size": 0.2,    # Only used if dataset doesn't have official train/test split
+
+    "split_mode": "cv",   # "cv" or "final_test"
+    "test_fold": 10,      # UrbanSound Specific (Recommended for all datasets to preprocess fold labelling externally)
+    "val_fold": 1,        # UrbanSound Specific (Recommended for all datasets to preprocess fold labelling externally)
+
     "epochs": 1,
     "learning_rate": 1e-5,
     "weight_decay": 1e-4, # Adam = 0, AdamW = 1e-2
