@@ -93,7 +93,7 @@ def train_one_epoch(
 
         num_batches += 1
 
-        if idx_batch % 20 == 0:
+        if idx_batch % 150 == 0:
             elapsed = time.time() - epoch_start_time
             msg = (
                 f"[TRAIN] "
@@ -298,7 +298,7 @@ def validate(
 
             all_target_leaf.append(target_leaf.detach().cpu())
 
-            if idx_batch % 20 == 0:
+            if idx_batch % 150 == 0:
                 elapsed = time.time() - val_start_time
 
                 msg = (
@@ -572,8 +572,9 @@ def fit(
                 csv_path=run_context.debug_csv_path,
             )
         
-        if epoch % 10 == 0 or epoch == 0 or epoch == epochs - 1:
-            torch.save(model.state_dict(), run_context.models_dir / f"model_epoch_{epoch + 1}.pt")
+        # save models
+        #if epoch % 10 == 0 or epoch == 0 or epoch == epochs - 1:
+        #    torch.save(model.state_dict(), run_context.models_dir / f"model_epoch_{epoch + 1}.pt")
 
         
     experiment_end_time = time.time()

@@ -3,7 +3,7 @@ from model_frameworks.models import MaskedHierarchicalVGG16
 CONFIG = {
 
     # experiment
-    "experiment_name": "ar_hierarchy_masked",
+    "experiment_name": "ar",
 
     # dataset
     "dataset": "urbansound8k",

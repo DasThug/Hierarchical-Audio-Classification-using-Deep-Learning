@@ -3,7 +3,7 @@ from model_frameworks.models import IndependentMultiHeadVGG16
 CONFIG = {
 
     # experiment
-    "experiment_name": "independent_hierarchy",
+    "experiment_name": "indep",
 
     # dataset
     "dataset": "urbansound8k",
