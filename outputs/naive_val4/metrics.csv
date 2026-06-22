@@ -1,0 +1,2 @@
+epoch,train_loss,val_loss,train_path_log_prob,train_path_prob,train_leaf_acc,val_path_log_prob,val_path_acc,val_leaf_acc,val_target_path_prob,val_pred_path_prob,val_level_0_acc,val_level_1_acc,val_level_2_acc
+1,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,0.10101010101010101,0.10101010101010101,NOT_IMPLEMENTED,NOT_IMPLEMENTED,0.3616161616161616,0.2222222222222222,0.10101010101010101
