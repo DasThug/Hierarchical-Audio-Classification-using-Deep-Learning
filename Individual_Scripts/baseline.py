@@ -94,7 +94,7 @@ def make_naive_metrics(naive_predictions_csv, output_metrics_csv):
 
 
 if __name__ == "__main__":
-    for i in [2,3,5,6,8,9]:
+    for i in [1,2,3,4,5,6,7,8,9]:
         input_csv = f"outputs_local/outputs2/flat_cv_valfold{i}/predictions.csv"
 
         naive_predictions_output = f"outputs/naive_val{i}/predictions.csv"

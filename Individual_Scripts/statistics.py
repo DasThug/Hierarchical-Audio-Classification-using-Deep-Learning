@@ -104,7 +104,16 @@ def summarize_metrics_at_selected_epoch(
 
 if __name__ == "__main__":
     csv_paths = [
-        "outputs_local/outputs2/flat_final_test_fold10/metrics.csv",
+        # "outputs_local/outputs2/independent_hierarchy_cv_valfold1/metrics.csv",
+        "outputs/naive_val1/metrics.csv",
+        "outputs/naive_val2/metrics.csv",
+        "outputs/naive_val3/metrics.csv",
+        "outputs/naive_val4/metrics.csv",
+        "outputs/naive_val5/metrics.csv",
+        "outputs/naive_val6/metrics.csv",
+        "outputs/naive_val7/metrics.csv",
+        "outputs/naive_val8/metrics.csv",
+        "outputs/naive_val9/metrics.csv",
     ]
 
     metrics = [
@@ -118,7 +127,7 @@ if __name__ == "__main__":
     summary, selected_epochs = summarize_metrics_at_selected_epoch(
         csv_paths=csv_paths,
         metrics=metrics,
-        selection_column="val_loss",
+        selection_column="epoch",
         selection_mode="min",
     )
 
@@ -154,3 +163,13 @@ if __name__ == "__main__":
             print("  Mean ± Std: NaN")
         else:
             print(f"  Mean ± Std: {mean:.4f} ± {std:.4f}")
+    
+    print("\nFinal Table Summary:")
+    for metric, stats in summary.items():
+        mean = stats["mean"]
+        std = stats["std"]
+
+        if np.isnan(mean):
+            print(f"{metric}: NaN")
+        else:
+            print(f"{metric}: {mean:.4f} ± {std:.4f}")

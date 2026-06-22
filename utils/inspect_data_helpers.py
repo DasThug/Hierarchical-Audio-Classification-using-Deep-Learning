@@ -425,6 +425,7 @@ def plot_leaf_confusion_matrix(
     index_dict: Optional[Dict[int, Dict[int, str]]] = None,
     normalize: bool = False,
     print_metrics: bool = True,
+    name=""
 ):
     """Plot confusion matrix for leaf predictions."""
     if "target_leaf" not in predictions_epoch.columns or "pred_leaf" not in predictions_epoch.columns:
@@ -443,7 +444,7 @@ def plot_leaf_confusion_matrix(
         labels=labels,
         label_names=names,
         normalize=normalize,
-        title="Leaf confusion matrix",
+        title=f"{name} Leaf confusion matrix",
         print_metrics=print_metrics,
     )
 
@@ -1422,6 +1423,7 @@ def plot_leaf_confusion_given_correct_level(
     index_dict=None,
     normalize=True,
     print_metrics=True,
+    name="",
 ):
     subset = predictions_epoch[
         predictions_epoch.apply(
@@ -1453,5 +1455,6 @@ def plot_leaf_confusion_given_correct_level(
         index_dict=index_dict,
         normalize=normalize,
         print_metrics=print_metrics,
+        name=name
     )
 
